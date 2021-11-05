@@ -5,7 +5,7 @@ using UnityEngine.SceneManagement;
 
 public class Spikes : MonoBehaviour
 {
-    private void OnCollisionEnter2D(Collision2D other)
+    private void OnCollisionStay2D(Collision2D other)
     {
         PlayerMover player = other.gameObject.GetComponent<PlayerMover>();
         if (player != null)

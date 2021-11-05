@@ -18,7 +18,7 @@ public class Statue : MonoBehaviour
 
         PlayerMover player = other.GetComponent<PlayerMover>();
         Portal portal = _portal.GetComponent<Portal>();
-        
+
         if (player != null)
         {
             portal.PortalActivate();

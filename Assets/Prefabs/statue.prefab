@@ -114,3 +114,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _buff: HP
   _portal: {fileID: 0}
+  _eye1: {fileID: 0}
+  _eye2: {fileID: 0}

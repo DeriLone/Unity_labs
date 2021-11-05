@@ -15,8 +15,8 @@ TagManager:
   - Player
   - Ground
   - Items
-  - 
-  - 
+  - Enemy
+  - Enemy_Projectile
   - 
   - 
   - 
@@ -62,6 +62,9 @@ TagManager:
     locked: 0
   - name: Items
     uniqueID: 3355919709
+    locked: 0
+  - name: Enemy
+    uniqueID: 936887051
     locked: 0
   - name: Player
     uniqueID: 1657160361

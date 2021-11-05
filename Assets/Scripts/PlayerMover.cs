@@ -27,16 +27,25 @@ public class PlayerMover : MonoBehaviour
     [SerializeField] private string _runAnimatorKey;
     [SerializeField] private string _jumpAnimatorKey;
     [SerializeField] private string _crouchAnimatorKey;
+    [SerializeField] private string _hurtAnimatorKey;
+    [SerializeField] private string _attackAnimationKey;
     
     private float _direction;
     private bool _jump;
     private bool _crawl;
-    private bool _isAttacking = false;
-    private bool _getHurt = false;
+    private bool _needToAttack = false;
+
+    private float _lastPushTime;
 
     [Header("Stats")] 
     [SerializeField] private int _MaxHp;
     [SerializeField] private int _MaxStamina;
+    [SerializeField] private int _damage;
+    [SerializeField] private Transform _swordAttackPointRight;
+    [SerializeField] private Transform _swordAttackPointLeft;
+    [SerializeField] private float _swordAttackWidth;
+    [SerializeField] private float _swordAttackHeight;
+    [SerializeField] private LayerMask _whatIsEnemy;
     
     private int _currentHp;
     private int _currentStamina;
@@ -124,23 +133,11 @@ public class PlayerMover : MonoBehaviour
 
         _crawl = Input.GetKey(KeyCode.C);
  
-        if (Input.GetButtonDown("Fire1") && !_isAttacking && CurrentStamina >= 10)
+        if (Input.GetButtonDown("Fire1"))
         {
-            CurrentStamina -= 10;
-            _isAttacking = true;
-            
-            _animator.Play("attack");
-        }
-        else
-        {
-            _isAttacking = false;
+            _needToAttack = true;
         }
 
-        if (_getHurt)
-        {
-            _getHurt = false;
-        }
-        
         if (CurrentStamina != _MaxStamina && !activeStaminaRestore)
         {
             activeStaminaRestore = true;
@@ -150,6 +147,12 @@ public class PlayerMover : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (_animator.GetBool(_hurtAnimatorKey))
+        {
+            if (Time.time - _lastPushTime > 1f)
+                _animator.SetBool(_hurtAnimatorKey, false);
+            return;
+        }   
         _rigidbody.velocity = new Vector2(_direction * _speed, _rigidbody.velocity.y);
 
         bool canJump = Physics2D.OverlapCircle(_groundChecker.position, _groundCheckerRadius, _whatIsGround);
@@ -166,6 +169,12 @@ public class PlayerMover : MonoBehaviour
         
         _animator.SetBool(_jumpAnimatorKey, !canJump);
         _animator.SetBool(_crouchAnimatorKey, !_headColider.enabled);
+
+        if (_needToAttack)
+        {
+            StartAttack();
+            _needToAttack = false;
+        }
     }
     
     private void OnDrawGizmos()
@@ -173,7 +182,50 @@ public class PlayerMover : MonoBehaviour
         Gizmos.DrawWireSphere(_groundChecker.position, _groundCheckerRadius);
         Gizmos.color = Color.red;  
         Gizmos.DrawWireSphere(_headChecker.position, _headCheckerRadius);
+        Gizmos.DrawWireCube(_swordAttackPointRight.position, new Vector3(_swordAttackWidth, _swordAttackHeight, 0));
+        Gizmos.DrawWireCube(_swordAttackPointLeft.position, new Vector3(_swordAttackWidth, _swordAttackHeight, 0));
+    }
 
+    private void StartAttack()
+    {
+        if (_animator.GetBool(_attackAnimationKey) || CurrentStamina < 10)
+        {
+            return;
+        }
+        
+        CurrentStamina -= 10;
+        _animator.SetBool(_attackAnimationKey, true);
+    }
+
+    private void Attack()
+    {
+        Collider2D[] targets;
+        
+        if(!_spriteRenderer.flipX)
+            targets = Physics2D.OverlapBoxAll(_swordAttackPointRight.position, new Vector2(_swordAttackWidth, _swordAttackHeight), _whatIsEnemy);
+        else
+            targets = Physics2D.OverlapBoxAll(_swordAttackPointLeft.position, new Vector2(_swordAttackWidth, _swordAttackHeight), _whatIsEnemy);
+        
+        foreach (var target in targets)
+        {
+            Hunter hunter = target.GetComponent<Hunter>();
+            Skeleton skeleton = target.GetComponent<Skeleton>();
+            HellGato hellGato = target.GetComponent<HellGato>();
+
+            if (hunter != null)
+            {
+                hunter.TakeDamage(_damage);
+            }
+            if (skeleton != null)
+            {
+                skeleton.TakeDamage(_damage);
+            }
+            if (hellGato != null)
+            {
+                hellGato.TakeDamage(_damage);
+            }
+        }
+        _animator.SetBool(_attackAnimationKey, false);
     }
 
     public void AddHp(int hpPoints, float regenerationRate)
@@ -216,22 +268,28 @@ public class PlayerMover : MonoBehaviour
     {
         return _MaxHp;
     }
-    
-    public void TakeDamage(int damage)
-    {
-        if (!_getHurt)
-        {
-            _getHurt = true;
-            _animator.Play("hurt");
 
-            CurrentHp -= damage;
-            
-            if (CurrentHp <= 0)
-            {
-                Debug.Log("You are dead");
-                gameObject.SetActive(false);
-                Invoke("ReloadScene", 1f);
-            }
+    public void TakeDamage(int damage, float pushPower = 0, float enemyPosX = 0)
+    {
+        if (_animator.GetBool(_hurtAnimatorKey))
+        {
+            return;
+        }
+
+        CurrentHp -= damage;
+        if (CurrentHp <= 0)
+        {
+            Debug.Log("You are dead");
+            gameObject.SetActive(false);
+            Invoke("ReloadScene", 1f);
+        }
+
+        if (pushPower != 0)
+        {
+            _lastPushTime = Time.time;
+            int direction = transform.position.x > enemyPosX ? 1 : -1;
+            _rigidbody.AddForce(new Vector2(direction * pushPower, 0));
+            _animator.SetBool(_hurtAnimatorKey, true);
         }
     }
 
