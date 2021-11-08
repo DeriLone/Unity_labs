@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine.UI;
 using UnityEngine;
 
-public class Skeleton : MonoBehaviour
+public class Skeleton : MonoBehaviour, IEnemyInterface
 {
     [SerializeField] private float _walkRange;
     [SerializeField] private Rigidbody2D _rigidbody2D;

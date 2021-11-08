@@ -13,7 +13,6 @@ public class PlayerMover : MonoBehaviour
     private Rigidbody2D _rigidbody;
     
     [SerializeField] private float _speed;
-    [SerializeField] private SpriteRenderer _spriteRenderer;
     [SerializeField] private float _jumpForce;
     [SerializeField] private Transform _groundChecker;
     [SerializeField] private float _groundCheckerRadius;
@@ -21,6 +20,7 @@ public class PlayerMover : MonoBehaviour
     [SerializeField] private Collider2D _headColider;
     [SerializeField] private float _headCheckerRadius;
     [SerializeField] private Transform _headChecker;
+    [SerializeField] private bool _faceRight;
 
     [Header("Animation")] 
     [SerializeField] private Animator _animator;
@@ -29,11 +29,13 @@ public class PlayerMover : MonoBehaviour
     [SerializeField] private string _crouchAnimatorKey;
     [SerializeField] private string _hurtAnimatorKey;
     [SerializeField] private string _attackAnimationKey;
+    [SerializeField] private string _castAnimationKey;
     
     private float _direction;
     private bool _jump;
     private bool _crawl;
     private bool _needToAttack = false;
+    private bool _needToCast = false;
 
     private float _lastPushTime;
 
@@ -41,11 +43,14 @@ public class PlayerMover : MonoBehaviour
     [SerializeField] private int _MaxHp;
     [SerializeField] private int _MaxStamina;
     [SerializeField] private int _damage;
-    [SerializeField] private Transform _swordAttackPointRight;
-    [SerializeField] private Transform _swordAttackPointLeft;
+    [SerializeField] private Transform _swordAttackPoint;
     [SerializeField] private float _swordAttackWidth;
     [SerializeField] private float _swordAttackHeight;
     [SerializeField] private LayerMask _whatIsEnemy;
+    [SerializeField] private int _skillDamage;
+    [SerializeField] private Transform _skillCastPoint;
+    [SerializeField] private float _skillLength;
+    [SerializeField] private LineRenderer _castLine;
     
     private int _currentHp;
     private int _currentStamina;
@@ -122,13 +127,13 @@ public class PlayerMover : MonoBehaviour
             _jump = true;
         } 
         
-        if (_direction > 0 && _spriteRenderer.flipX)
+        if (_direction > 0 && !_faceRight)
         {
-            _spriteRenderer.flipX = false;
+            Flip();
         }
-        else if (_direction < 0 && !_spriteRenderer.flipX)
+        else if (_direction < 0 && _faceRight)
         {
-            _spriteRenderer.flipX = true;
+            Flip();
         }
 
         _crawl = Input.GetKey(KeyCode.C);
@@ -136,6 +141,14 @@ public class PlayerMover : MonoBehaviour
         if (Input.GetButtonDown("Fire1"))
         {
             _needToAttack = true;
+        }
+        if (Input.GetButtonDown("Fire2"))
+        {
+            _needToCast = true;
+        }
+        if (Input.GetButtonUp("Fire2"))
+        {
+            StopCast();
         }
 
         if (CurrentStamina != _MaxStamina && !activeStaminaRestore)
@@ -145,19 +158,30 @@ public class PlayerMover : MonoBehaviour
         }
     }
 
+    private void Flip()
+    {
+        _faceRight = !_faceRight;
+        transform.Rotate(0,180,0);
+    }
+
     private void FixedUpdate()
     {
         if (_animator.GetBool(_hurtAnimatorKey))
         {
             if (Time.time - _lastPushTime > 1f)
+            {
                 _animator.SetBool(_hurtAnimatorKey, false);
-            return;
-        }   
-        _rigidbody.velocity = new Vector2(_direction * _speed, _rigidbody.velocity.y);
+            }
 
+            _needToAttack = false;
+            _needToCast = false;
+            return;
+        }
+        
+        _rigidbody.velocity = new Vector2(_direction * _speed, _rigidbody.velocity.y);
+        
         bool canJump = Physics2D.OverlapCircle(_groundChecker.position, _groundCheckerRadius, _whatIsGround);
         bool canStand = !Physics2D.OverlapCircle(_headChecker.position, _headCheckerRadius, _whatIsGround);
-
         
         _headColider.enabled = !_crawl && canStand;
         if (_jump && canJump)
@@ -165,15 +189,29 @@ public class PlayerMover : MonoBehaviour
             _rigidbody.AddForce(Vector2.up * _jumpForce);
             _jump = false;
         }
-
         
         _animator.SetBool(_jumpAnimatorKey, !canJump);
         _animator.SetBool(_crouchAnimatorKey, !_headColider.enabled);
 
+        if (!_headColider.enabled || !canJump)
+        {
+            _needToAttack = false;
+            _needToCast = false;
+            return;
+        }
+        
         if (_needToAttack)
         {
             StartAttack();
-            _needToAttack = false;
+            _direction = 0;
+            return;
+        }
+
+        if (_needToCast)
+        {
+            StartCast();
+            _direction = 0;
+            _rigidbody.velocity = new Vector2(0, 0);
         }
     }
     
@@ -182,50 +220,73 @@ public class PlayerMover : MonoBehaviour
         Gizmos.DrawWireSphere(_groundChecker.position, _groundCheckerRadius);
         Gizmos.color = Color.red;  
         Gizmos.DrawWireSphere(_headChecker.position, _headCheckerRadius);
-        Gizmos.DrawWireCube(_swordAttackPointRight.position, new Vector3(_swordAttackWidth, _swordAttackHeight, 0));
-        Gizmos.DrawWireCube(_swordAttackPointLeft.position, new Vector3(_swordAttackWidth, _swordAttackHeight, 0));
+        Gizmos.DrawWireCube(_swordAttackPoint.position, new Vector3(_swordAttackWidth, _swordAttackHeight, 0));
     }
 
     private void StartAttack()
     {
-        if (_animator.GetBool(_attackAnimationKey) || CurrentStamina < 10)
+        if (_animator.GetBool(_attackAnimationKey) || CurrentStamina < 15)
         {
             return;
         }
         
-        CurrentStamina -= 10;
+        CurrentStamina -= 15;
         _animator.SetBool(_attackAnimationKey, true);
     }
 
     private void Attack()
     {
-        Collider2D[] targets;
-        
-        if(!_spriteRenderer.flipX)
-            targets = Physics2D.OverlapBoxAll(_swordAttackPointRight.position, new Vector2(_swordAttackWidth, _swordAttackHeight), _whatIsEnemy);
-        else
-            targets = Physics2D.OverlapBoxAll(_swordAttackPointLeft.position, new Vector2(_swordAttackWidth, _swordAttackHeight), _whatIsEnemy);
-        
+        Collider2D[] targets = Physics2D.OverlapBoxAll(_swordAttackPoint.position, new Vector2(_swordAttackWidth, _swordAttackHeight), _whatIsEnemy);
+
         foreach (var target in targets)
         {
-            Hunter hunter = target.GetComponent<Hunter>();
-            Skeleton skeleton = target.GetComponent<Skeleton>();
-            HellGato hellGato = target.GetComponent<HellGato>();
+            IEnemyInterface enemy = target.GetComponent<IEnemyInterface>();
 
-            if (hunter != null)
+            if (enemy != null)
             {
-                hunter.TakeDamage(_damage);
-            }
-            if (skeleton != null)
-            {
-                skeleton.TakeDamage(_damage);
-            }
-            if (hellGato != null)
-            {
-                hellGato.TakeDamage(_damage);
+                enemy.TakeDamage(_damage);
             }
         }
         _animator.SetBool(_attackAnimationKey, false);
+        _needToAttack = false;
+    }
+
+    private void StartCast()
+    {
+        if (CurrentStamina < 5 || CurrentHp == 1)
+        {
+            StopCast();
+            return;
+        }
+        
+        CurrentStamina -= 3;
+        TakeDamage(1);
+        _animator.SetBool(_castAnimationKey, true);
+    }
+
+    private void Cast()
+    {
+        RaycastHit2D[] hits = Physics2D.RaycastAll(_skillCastPoint.position, transform.right, _skillLength, _whatIsEnemy);
+
+        foreach (var hit in hits)
+        {
+            IEnemyInterface target = hit.collider.GetComponent<IEnemyInterface>();
+
+            if (target != null)
+            {
+                target.TakeDamage(_skillDamage);
+            }
+        }
+        _castLine.SetPosition(0, _skillCastPoint.position);
+        _castLine.SetPosition(1, _skillCastPoint.position + transform.right * _skillLength);
+        _castLine.enabled = true;
+    }
+
+    private void StopCast()
+    {
+        _animator.SetBool(_castAnimationKey, false);
+        _castLine.enabled = false;
+        _needToCast = false;
     }
 
     public void AddHp(int hpPoints, float regenerationRate)
@@ -253,10 +314,16 @@ public class PlayerMover : MonoBehaviour
         Debug.Log("You are inspired\nYour max " + buff + " is increased");
         if (buff == "HP")
         {
-            _MaxHp += 10;
+            _MaxHp = 150;
             _hpBar.maxValue = _MaxHp;
 
-            CurrentHp += 10;
+            CurrentHp += 50;
+        }
+        else if (buff == "Attack")
+        {
+            _damage = 30;
+            _swordAttackWidth = 3;
+            _MaxStamina = 125;
         }
     }
 
@@ -297,7 +364,7 @@ public class PlayerMover : MonoBehaviour
     {
         while (CurrentStamina != _MaxStamina)
         {
-            CurrentStamina++;
+            CurrentStamina+=5;
             yield return new WaitForSeconds(0.6f);
         }
 

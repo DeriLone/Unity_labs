@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using UnityEngine;
 
 
-public class HellGato : MonoBehaviour
+public class HellGato : MonoBehaviour, IEnemyInterface
 {
     [SerializeField] private float _attackRange;
     [SerializeField] private LayerMask _whatIsPlayer;
@@ -43,7 +43,7 @@ public class HellGato : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        Gizmos.DrawWireCube(new Vector2(transform.position.x, transform.position.y - 0.5f), new Vector2(_attackRange, 1));
+        Gizmos.DrawWireCube(new Vector2(transform.position.x, transform.position.y - 0.7f), new Vector2(_attackRange, 1));
     }
     
     private void FixedUpdate()
@@ -54,7 +54,7 @@ public class HellGato : MonoBehaviour
 
     private void CheckForPlayer()
     {
-        Collider2D player = Physics2D.OverlapBox(new Vector2(transform.position.x, transform.position.y - 0.5f), new Vector2(_attackRange, 1), 0, _whatIsPlayer);
+        Collider2D player = Physics2D.OverlapBox(new Vector2(transform.position.x, transform.position.y - 0.7f), new Vector2(_attackRange, 1), 0, _whatIsPlayer);
         if (player != null)
         {
             StartChase(player.transform.position);

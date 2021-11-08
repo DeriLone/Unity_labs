@@ -4,7 +4,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class Hunter : MonoBehaviour
+public class Hunter : MonoBehaviour, IEnemyInterface
 {
     [SerializeField] private float _attackRange;
     [SerializeField] private LayerMask _whatIsPlayer;
